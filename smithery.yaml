@@ -1,40 +1,70 @@
-name: twitter-mcp
-description: Twitter MCP server with advanced sentiment analysis capabilities
+name: twitter-market-sentiment-mcp
 version: 1.0.0
-type: http  # Using HTTP transport (recommended)
+description: Twitter Market Sentiment Analysis MCP Server
 
-# Base directory configuration
-base_dir: src  # Points to the source code directory
+# Base configuration
+base_dir: src
+module: twitter_mcp:app
 
-# Environment variables that will be needed
-env:
-  - TWITTER_API_KEY
-  - TWITTER_API_SECRET
-  - TWITTER_ACCESS_TOKEN
-  - TWITTER_ACCESS_TOKEN_SECRET
+# Environment configuration
+environment:
+  - name: TWITTER_API_KEY
+    required: true
+    description: Twitter API Key
+  - name: TWITTER_API_SECRET
+    required: true
+    description: Twitter API Secret
+  - name: TWITTER_ACCESS_TOKEN
+    required: true
+    description: Twitter Access Token
+  - name: TWITTER_ACCESS_TOKEN_SECRET
+    required: true
+    description: Twitter Access Token Secret
+  - name: TWITTER_BEARER_TOKEN
+    required: true
+    description: Twitter Bearer Token for v2 API
 
-# Dependencies
-dependencies:
-  - fastapi
-  - tweepy
-  - textblob
-  - python-dotenv
-  - uvicorn
-
-# HTTP configuration
-http:
-  endpoint: /mcp  # Required by Smithery
+# Server configuration
+server:
+  host: 0.0.0.0
   port: 8000
-  module: twitter_mcp:app  # Specifies the FastAPI application module
+  workers: 4
+  reload: true
 
-# Security settings
-security:
-  cors:
-    enabled: true
-    origins: ["*"]
+# Health check configuration
+health_check:
+  endpoint: /health
+  interval: 30s
+  timeout: 5s
+  retries: 3
 
-# Monitoring
-monitoring:
-  logging:
-    level: INFO
-    format: json 
+# CORS configuration
+cors:
+  allow_origins:
+    - "*"
+  allow_methods:
+    - GET
+    - POST
+  allow_headers:
+    - Content-Type
+    - Authorization
+
+# Logging configuration
+logging:
+  level: INFO
+  format: json
+
+# Documentation
+docs:
+  enabled: true
+  swagger_ui: true
+  redoc: true
+  title: Twitter Market Sentiment MCP
+  description: Financial market sentiment analysis using Twitter data
+  version: 1.0.0
+
+# Build configuration
+build:
+  dockerfile: Dockerfile
+  context: .
+  target: production 

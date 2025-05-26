@@ -1,0 +1,55 @@
+# Version control
+.git
+.gitignore
+
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+.env
+.venv
+env/
+venv/
+ENV/
+env.bak/
+venv.bak/
+*.egg-info/
+dist/
+build/
+
+# IDE
+.idea/
+.vscode/
+*.swp
+*.swo
+
+# Logs
+*.log
+logs/
+
+# Test coverage
+.coverage
+htmlcov/
+.pytest_cache/
+
+# Docker
+Dockerfile
+.dockerignore
+
+# Documentation
+docs/
+*.md
+
+# Local development
+.env.local
+.env.development
+.env.test
+.env.production
+
+# Misc
+.DS_Store
+*.bak
+*.tmp
+*.temp 

@@ -33,15 +33,13 @@ mcp = APIRouter(
 )
 
 # Twitter API setup
-auth = tweepy.OAuthHandler(
-    os.getenv("TWITTER_API_KEY"),
-    os.getenv("TWITTER_API_SECRET")
+client = tweepy.Client(
+    bearer_token=os.getenv("TWITTER_BEARER_TOKEN"),
+    consumer_key=os.getenv("TWITTER_API_KEY"),
+    consumer_secret=os.getenv("TWITTER_API_SECRET"),
+    access_token=os.getenv("TWITTER_ACCESS_TOKEN"),
+    access_token_secret=os.getenv("TWITTER_ACCESS_TOKEN_SECRET")
 )
-auth.set_access_token(
-    os.getenv("TWITTER_ACCESS_TOKEN"),
-    os.getenv("TWITTER_ACCESS_TOKEN_SECRET")
-)
-twitter_api = tweepy.API(auth)
 
 # Pydantic models
 class MarketSentimentRequest(BaseModel):
@@ -142,16 +140,27 @@ async def get_capabilities():
 @mcp.post("/analyze_market_sentiment")
 async def analyze_market_sentiment(request: MarketSentimentRequest) -> MarketSentimentResponse:
     try:
-        # Get tweets about the stock symbol
+        # Get tweets about the stock symbol using v2 API
         search_query = f"${request.symbol} OR #{request.symbol} lang:en -is:retweet"
-        tweets = twitter_api.search_tweets(
-            q=search_query,
-            count=100,
-            result_type='recent'
+        tweets = client.search_recent_tweets(
+            query=search_query,
+            max_results=100,
+            tweet_fields=['created_at', 'public_metrics']
         )
         
+        if not tweets.data:
+            return MarketSentimentResponse(
+                symbol=request.symbol,
+                sentiment_score=0,
+                sentiment_label="neutral",
+                tweet_count=0,
+                common_topics=[],
+                price_mentions={},
+                bullish_ratio=0.5
+            )
+        
         # Analyze sentiment
-        texts = [tweet.text for tweet in tweets]
+        texts = [tweet.text for tweet in tweets.data]
         sentiments = [TextBlob(text).sentiment.polarity for text in texts]
         avg_sentiment = sum(sentiments) / len(sentiments) if sentiments else 0
         
@@ -172,13 +181,13 @@ async def analyze_market_sentiment(request: MarketSentimentRequest) -> MarketSen
             symbol=request.symbol,
             sentiment_score=avg_sentiment,
             sentiment_label=label,
-            tweet_count=len(tweets),
+            tweet_count=len(texts),
             common_topics=market_topics,
             price_mentions=price_mentions,
             bullish_ratio=bullish_ratio
         )
-    except tweepy.TweepError as e:
-        raise HTTPException(status_code=400, detail=str(e))
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
 
 @mcp.post("/analyze_market_trends")
 async def analyze_market_trends(request: TrendAnalysisRequest) -> TrendAnalysisResponse:
@@ -190,13 +199,13 @@ async def analyze_market_trends(request: TrendAnalysisRequest) -> TrendAnalysisR
         for symbol in request.symbols:
             # Get tweets for each symbol
             search_query = f"${symbol} OR #{symbol} lang:en -is:retweet"
-            tweets = twitter_api.search_tweets(
-                q=search_query,
-                count=request.min_tweets,
-                result_type='recent'
+            tweets = client.search_recent_tweets(
+                query=search_query,
+                max_results=request.min_tweets,
+                tweet_fields=['created_at', 'public_metrics']
             )
             
-            texts = [tweet.text for tweet in tweets]
+            texts = [tweet.text for tweet in tweets.data]
             sentiments = [TextBlob(text).sentiment.polarity for text in texts]
             avg_sentiment = sum(sentiments) / len(sentiments) if sentiments else 0
             
@@ -209,7 +218,7 @@ async def analyze_market_trends(request: TrendAnalysisRequest) -> TrendAnalysisR
             # Store insights for this symbol
             market_insights[symbol] = {
                 "sentiment_score": avg_sentiment,
-                "tweet_count": len(tweets),
+                "tweet_count": len(texts),
                 "price_mentions": price_mentions,
                 "bullish_ratio": bullish_ratio
             }
@@ -229,8 +238,8 @@ async def analyze_market_trends(request: TrendAnalysisRequest) -> TrendAnalysisR
             correlated_topics=correlated_topics,
             market_mood=market_mood
         )
-    except tweepy.TweepError as e:
-        raise HTTPException(status_code=400, detail=str(e))
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
 
 @mcp.post("/monitor_market")
 async def monitor_market(request: MarketMonitorRequest) -> MarketMonitorResponse:
@@ -241,13 +250,13 @@ async def monitor_market(request: MarketMonitorRequest) -> MarketMonitorResponse
         for symbol in request.watchlist:
             # Get recent tweets for each symbol
             search_query = f"${symbol} OR #{symbol} lang:en -is:retweet"
-            tweets = twitter_api.search_tweets(
-                q=search_query,
-                count=50,
-                result_type='recent'
+            tweets = client.search_recent_tweets(
+                query=search_query,
+                max_results=50,
+                tweet_fields=['created_at', 'public_metrics']
             )
             
-            texts = [tweet.text for tweet in tweets]
+            texts = [tweet.text for tweet in tweets.data]
             all_texts.extend(texts)
             
             # Calculate sentiment for this symbol
@@ -280,8 +289,8 @@ async def monitor_market(request: MarketMonitorRequest) -> MarketMonitorResponse
             trending_topics=trending_topics,
             price_sentiment_correlation=price_sentiment
         )
-    except tweepy.TweepError as e:
-        raise HTTPException(status_code=400, detail=str(e))
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
 
 # Health check endpoint (required by Smithery)
 @app.get("/health")

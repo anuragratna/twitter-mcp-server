@@ -13,7 +13,8 @@ def test_env_variables() -> Dict[str, bool]:
         "TWITTER_API_KEY",
         "TWITTER_API_SECRET",
         "TWITTER_ACCESS_TOKEN",
-        "TWITTER_ACCESS_TOKEN_SECRET"
+        "TWITTER_ACCESS_TOKEN_SECRET",
+        "TWITTER_BEARER_TOKEN"
     ]
     
     results = {}
@@ -26,17 +27,16 @@ def test_env_variables() -> Dict[str, bool]:
 def test_twitter_connection() -> Dict[str, bool]:
     """Test Twitter API connection"""
     try:
-        auth = tweepy.OAuthHandler(
-            os.getenv("TWITTER_API_KEY"),
-            os.getenv("TWITTER_API_SECRET")
-        )
-        auth.set_access_token(
-            os.getenv("TWITTER_ACCESS_TOKEN"),
-            os.getenv("TWITTER_ACCESS_TOKEN_SECRET")
+        client = tweepy.Client(
+            bearer_token=os.getenv("TWITTER_BEARER_TOKEN"),
+            consumer_key=os.getenv("TWITTER_API_KEY"),
+            consumer_secret=os.getenv("TWITTER_API_SECRET"),
+            access_token=os.getenv("TWITTER_ACCESS_TOKEN"),
+            access_token_secret=os.getenv("TWITTER_ACCESS_TOKEN_SECRET")
         )
         
-        api = tweepy.API(auth)
-        api.verify_credentials()
+        # Test search functionality
+        test_tweets = client.search_recent_tweets(query="test", max_results=10)
         
         return {
             "auth_success": True,

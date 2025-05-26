@@ -1,0 +1,25 @@
+version: '1.0'
+name: twitter-mcp-server
+
+build:
+  dockerfile: Dockerfile
+  context: .
+
+deploy:
+  replicas: 1
+  port: 8001
+  health_check:
+    path: /health
+    port: 8001
+    initial_delay_seconds: 10
+    period_seconds: 30
+
+env:
+  - name: TWITTER_API_KEY
+    required: true
+  - name: TWITTER_API_SECRET
+    required: true
+  - name: TWITTER_ACCESS_TOKEN
+    required: true
+  - name: TWITTER_ACCESS_TOKEN_SECRET
+    required: true 

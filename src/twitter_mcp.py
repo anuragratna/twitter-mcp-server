@@ -26,9 +26,11 @@ app = FastAPI(
     redoc_url="/redoc"
 )
 
-# Initialize MCP router
-mcp = APIRouter()
-app.include_router(mcp, prefix="/mcp")
+# Initialize MCP router with tags for better documentation
+mcp = APIRouter(
+    prefix="/mcp",
+    tags=["Market Sentiment Analysis"]
+)
 
 # Twitter API setup
 auth = tweepy.OAuthHandler(
@@ -291,4 +293,7 @@ async def health_check():
 @app.get("/")
 async def root():
     """Redirect root to documentation"""
-    return {"message": "Welcome to Twitter Market Sentiment MCP", "docs_url": "/docs"} 
+    return {"message": "Welcome to Twitter Market Sentiment MCP", "docs_url": "/docs"}
+
+# Include the MCP router
+app.include_router(mcp) 

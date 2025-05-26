@@ -6,6 +6,7 @@ Provides financial market sentiment analysis through Twitter data
 from fastapi import FastAPI, HTTPException, APIRouter
 from textblob import TextBlob
 import tweepy
+from tweepy import errors as tweepy_errors
 from typing import Dict, List, Optional
 import os
 from dotenv import load_dotenv
@@ -185,6 +186,16 @@ async def analyze_market_sentiment(request: MarketSentimentRequest) -> MarketSen
             common_topics=market_topics,
             price_mentions=price_mentions,
             bullish_ratio=bullish_ratio
+        )
+    except (tweepy_errors.Forbidden, tweepy_errors.Unauthorized) as e:
+        raise HTTPException(
+            status_code=403,
+            detail="Twitter API access denied. Please check your API access level and credentials."
+        )
+    except tweepy_errors.TooManyRequests as e:
+        raise HTTPException(
+            status_code=429,
+            detail="Twitter API rate limit exceeded. Please try again later."
         )
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))

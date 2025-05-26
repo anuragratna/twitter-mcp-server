@@ -93,10 +93,11 @@ def calculate_bullish_ratio(texts: List[str]) -> float:
     bullish_words = {'buy', 'bull', 'long', 'up', 'calls', 'moon', 'higher'}
     bearish_words = {'sell', 'bear', 'short', 'down', 'puts', 'crash', 'lower'}
     
-    for text in text.lower():
-        if any(word in text for word in bullish_words):
+    for text in texts:
+        text_lower = text.lower()
+        if any(word in text_lower for word in bullish_words):
             bullish_count += 1
-        if any(word in text for word in bearish_words):
+        if any(word in text_lower for word in bearish_words):
             bearish_count += 1
     
     total = bullish_count + bearish_count

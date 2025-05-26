@@ -142,7 +142,7 @@ async def get_capabilities():
 async def analyze_market_sentiment(request: MarketSentimentRequest) -> MarketSentimentResponse:
     try:
         # Get tweets about the stock symbol using v2 API
-        search_query = f"${request.symbol} OR #{request.symbol} lang:en -is:retweet"
+        search_query = f"symbol:{request.symbol} OR #{request.symbol} lang:en -is:retweet"
         tweets = client.search_recent_tweets(
             query=search_query,
             max_results=100,
@@ -190,7 +190,7 @@ async def analyze_market_sentiment(request: MarketSentimentRequest) -> MarketSen
     except (tweepy_errors.Forbidden, tweepy_errors.Unauthorized) as e:
         raise HTTPException(
             status_code=403,
-            detail="Twitter API access denied. Please check your API access level and credentials."
+            detail=f"Twitter API access denied. Please check your API access level and credentials. Error: {str(e)}"
         )
     except tweepy_errors.TooManyRequests as e:
         raise HTTPException(
@@ -198,7 +198,10 @@ async def analyze_market_sentiment(request: MarketSentimentRequest) -> MarketSen
             detail="Twitter API rate limit exceeded. Please try again later."
         )
     except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
+        raise HTTPException(
+            status_code=500,
+            detail=f"An error occurred while processing your request: {str(e)}"
+        )
 
 @mcp.post("/analyze_market_trends")
 async def analyze_market_trends(request: TrendAnalysisRequest) -> TrendAnalysisResponse:

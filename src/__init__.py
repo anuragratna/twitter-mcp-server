@@ -1,3 +1,3 @@
 """
-Twitter MCP Server package
+Twitter Market MCP Server package
 """ 

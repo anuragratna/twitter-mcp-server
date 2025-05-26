@@ -1,25 +1,79 @@
-version: '1.0'
-name: twitter-mcp-server
+name: twitter-market-mcp
+version: 1.0.0
+description: Market sentiment analysis service using Twitter and stock data
 
-build:
-  dockerfile: Dockerfile
-  context: .
+service:
+  type: mcp
+  protocol: http
+  port: 8000
+  healthcheck:
+    path: /
+    interval: 30s
+    timeout: 5s
+    retries: 3
+  readiness:
+    path: /_mcp/capabilities
+    initialDelaySeconds: 10
 
-deploy:
-  replicas: 1
-  port: 8001
-  health_check:
-    path: /health
-    port: 8001
-    initial_delay_seconds: 10
-    period_seconds: 30
+resources:
+  cpu: 0.5
+  memory: 512Mi
+  replicas: 2
 
-env:
-  - name: TWITTER_API_KEY
-    required: true
-  - name: TWITTER_API_SECRET
-    required: true
-  - name: TWITTER_ACCESS_TOKEN
-    required: true
-  - name: TWITTER_ACCESS_TOKEN_SECRET
-    required: true 
+environment:
+  - name: PORT
+    value: "8000"
+  - name: CACHE_DURATION
+    value: "3600"
+  - name: LOG_LEVEL
+    value: "INFO"
+  - name: PYTHONPATH
+    value: "/app"
+
+endpoints:
+  - path: /analyze
+    method: POST
+    description: Analyze market sentiment for a stock symbol
+    rateLimit:
+      requests: 100
+      period: 1m
+  - path: /stock/{symbol}
+    method: GET
+    description: Get basic stock information
+    rateLimit:
+      requests: 200
+      period: 1m
+  - path: /_mcp/analyze
+    method: POST
+    description: MCP protocol endpoint for analysis
+    rateLimit:
+      requests: 100
+      period: 1m
+  - path: /_mcp/capabilities
+    method: GET
+    description: MCP protocol capabilities
+
+scaling:
+  min_replicas: 1
+  max_replicas: 5
+  target_cpu_utilization: 70
+  cooldown:
+    scale_up: 60s
+    scale_down: 300s
+
+security:
+  cors:
+    enabled: true
+    origins: ["*"]
+  headers:
+    - X-Frame-Options: DENY
+    - X-Content-Type-Options: nosniff
+    - Strict-Transport-Security: max-age=31536000; includeSubDomains
+
+monitoring:
+  metrics:
+    enabled: true
+    path: /metrics
+  logging:
+    level: INFO
+    format: json 

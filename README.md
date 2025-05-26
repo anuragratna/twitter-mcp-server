@@ -1,41 +1,53 @@
-# Twitter MCP Server
+# Twitter Market MCP Server
 
-A Machine Control Protocol (MCP) server that provides Twitter functionality through Claude Desktop. This server enables tweeting, tweet deletion, and powerful sentiment analysis capabilities. The sentiment analysis feature helps you understand the emotional tone of text content, making it a valuable tool for social media analysis and content moderation.
+A Model Context Protocol (MCP) server that provides market sentiment analysis by combining Twitter data with stock market information.
 
 ## Features
 
-- Advanced sentiment analysis for text content
-  - Analyze emotional tone of tweets
-  - Get sentiment insights before posting
-  - Evaluate content sentiment for moderation
-- Post tweets
-- Delete tweets
-- FastAPI-based MCP server
-- Docker support for easy deployment
+- Real-time stock data analysis using yfinance
+- Sentiment analysis using TextBlob
+- MCP protocol compliance
+- RESTful API endpoints
+- Rate limiting and caching
+- CORS support
 
-## Prerequisites
+## API Endpoints
 
-- Python 3.8+
-- Twitter API credentials
-- Docker (for containerized deployment)
+- `GET /` - Health check
+- `POST /analyze` - Analyze market sentiment for a stock symbol
+- `GET /stock/{symbol}` - Get basic stock information
+- `POST /_mcp/analyze` - MCP protocol endpoint for analysis
+- `GET /_mcp/capabilities` - MCP protocol capabilities
+
+## Deployment on Smithery
+
+1. Build the Docker image:
+```bash
+docker build -t twitter-market-mcp .
+```
+
+2. Test locally:
+```bash
+docker run -p 8000:8000 twitter-market-mcp
+```
+
+3. Deploy to Smithery:
+```bash
+smithery deploy
+```
 
 ## Environment Variables
 
-Create a `.env` file with your Twitter API credentials:
+- `PORT` - Server port (default: 8000)
+- `CACHE_DURATION` - Cache duration in seconds (default: 3600)
+- `LOG_LEVEL` - Logging level (default: INFO)
 
-```env
-TWITTER_API_KEY=your_api_key
-TWITTER_API_SECRET=your_api_secret
-TWITTER_ACCESS_TOKEN=your_access_token
-TWITTER_ACCESS_TOKEN_SECRET=your_access_token_secret
-```
-
-## Local Development
+## Development
 
 1. Create a virtual environment:
 ```bash
 python -m venv .venv
-source .venv/bin/activate  # On Windows: .venv\\Scripts\\activate
+source .venv/bin/activate  # On Windows: .venv\Scripts\activate
 ```
 
 2. Install dependencies:
@@ -43,89 +55,23 @@ source .venv/bin/activate  # On Windows: .venv\\Scripts\\activate
 pip install -r requirements.txt
 ```
 
-3. Start the server:
+3. Run locally:
 ```bash
-uvicorn src.main:app --host 0.0.0.0 --port 8001 --reload
+uvicorn src.mcp_server:app --reload
 ```
 
-## Docker Deployment
+## Testing
 
-1. Build the image:
+Run the test suite:
 ```bash
-docker build -t twitter-mcp-server .
+python src/test_twitter_market_mcp.py
 ```
-
-2. Run the container:
-```bash
-docker run -p 8001:8001 --env-file .env twitter-mcp-server
-```
-
-## Smithery Deployment
-
-1. Push your code to a Git repository
-2. In Smithery:
-   - Create a new service
-   - Connect your Git repository
-   - Set the following environment variables:
-     - `TWITTER_API_KEY`
-     - `TWITTER_API_SECRET`
-     - `TWITTER_ACCESS_TOKEN`
-     - `TWITTER_ACCESS_TOKEN_SECRET`
-   - Deploy using the provided Dockerfile
-
-## Claude Desktop Integration
-
-1. Copy the following configuration to your Claude Desktop config:
-```json
-{
-  "mcp_servers": [
-    {
-      "name": "Twitter MCP Server",
-      "url": "http://your-smithery-url:8001",
-      "tools": [
-        {
-          "name": "twitter.tweet",
-          "description": "Post a tweet",
-          "parameters": {
-            "text": {
-              "type": "string",
-              "description": "The text content of the tweet"
-            }
-          }
-        },
-        {
-          "name": "twitter.delete_tweet",
-          "description": "Delete a tweet",
-          "parameters": {
-            "tweet_id": {
-              "type": "string",
-              "description": "The ID of the tweet to delete"
-            }
-          }
-        },
-        {
-          "name": "twitter.analyze_sentiment",
-          "description": "Analyze the sentiment of text",
-          "parameters": {
-            "text": {
-              "type": "string",
-              "description": "The text to analyze for sentiment"
-            }
-          }
-        }
-      ]
-    }
-  ]
-}
-```
-
-2. Replace `your-smithery-url` with your actual Smithery deployment URL
 
 ## API Documentation
 
-Once the server is running, visit:
-- OpenAPI documentation: `http://localhost:8001/docs`
-- ReDoc documentation: `http://localhost:8001/redoc`
+Once running, visit:
+- OpenAPI docs: `http://localhost:8000/docs`
+- ReDoc: `http://localhost:8000/redoc`
 
 ## License
 

@@ -19,6 +19,9 @@ wheels/
 *.egg-info/
 .installed.cfg
 *.egg
+.pytest_cache/
+.coverage
+htmlcov/
 
 # Virtual Environment
 .env
@@ -26,6 +29,7 @@ wheels/
 env/
 venv/
 ENV/
+.python-version
 
 # IDE
 .idea/
@@ -33,6 +37,20 @@ ENV/
 *.swp
 *.swo
 
-# OS
+# Logs
+*.log
+
+# Docker
+.docker/
+.dockerignore
+
+# Local development
 .DS_Store
-Thumbs.db
+.coverage
+htmlcov/
+.pytest_cache/
+.mypy_cache/
+uv.lock
+
+# Smithery
+.smithery/

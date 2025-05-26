@@ -211,36 +211,62 @@ async def analyze_market_trends(request: TrendAnalysisRequest) -> TrendAnalysisR
         total_sentiment = 0
         
         for symbol in request.symbols:
-            # Get tweets for each symbol
-            search_query = f"${symbol} OR #{symbol} lang:en -is:retweet"
-            tweets = client.search_recent_tweets(
-                query=search_query,
-                max_results=request.min_tweets,
-                tweet_fields=['created_at', 'public_metrics']
+            try:
+                # Get tweets for each symbol
+                search_query = f"symbol:{symbol} OR #{symbol} lang:en -is:retweet"
+                tweets = client.search_recent_tweets(
+                    query=search_query,
+                    max_results=request.min_tweets,
+                    tweet_fields=['created_at', 'public_metrics']
+                )
+                
+                if not tweets.data:
+                    market_insights[symbol] = {
+                        "sentiment_score": 0,
+                        "tweet_count": 0,
+                        "price_mentions": {},
+                        "bullish_ratio": 0.5
+                    }
+                    continue
+                
+                texts = [tweet.text for tweet in tweets.data]
+                sentiments = [TextBlob(text).sentiment.polarity for text in texts]
+                avg_sentiment = sum(sentiments) / len(sentiments) if sentiments else 0
+                
+                # Get market topics and price mentions
+                market_topics = extract_market_topics(texts)
+                all_topics.extend(market_topics)
+                price_mentions = extract_price_mentions(texts)
+                bullish_ratio = calculate_bullish_ratio(texts)
+                
+                # Store insights for this symbol
+                market_insights[symbol] = {
+                    "sentiment_score": avg_sentiment,
+                    "tweet_count": len(texts),
+                    "price_mentions": price_mentions,
+                    "bullish_ratio": bullish_ratio
+                }
+                
+                total_sentiment += avg_sentiment
+            except tweepy_errors.TooManyRequests as e:
+                raise HTTPException(
+                    status_code=429,
+                    detail="Twitter API rate limit exceeded. Please try again later."
+                )
+            except (tweepy_errors.Forbidden, tweepy_errors.Unauthorized) as e:
+                raise HTTPException(
+                    status_code=403,
+                    detail=f"Twitter API access denied for symbol {symbol}. Please check your API access level and credentials. Error: {str(e)}"
+                )
+        
+        if not market_insights:
+            raise HTTPException(
+                status_code=404,
+                detail="No data found for any of the requested symbols"
             )
-            
-            texts = [tweet.text for tweet in tweets.data]
-            sentiments = [TextBlob(text).sentiment.polarity for text in texts]
-            avg_sentiment = sum(sentiments) / len(sentiments) if sentiments else 0
-            
-            # Get market topics and price mentions
-            market_topics = extract_market_topics(texts)
-            all_topics.extend(market_topics)
-            price_mentions = extract_price_mentions(texts)
-            bullish_ratio = calculate_bullish_ratio(texts)
-            
-            # Store insights for this symbol
-            market_insights[symbol] = {
-                "sentiment_score": avg_sentiment,
-                "tweet_count": len(texts),
-                "price_mentions": price_mentions,
-                "bullish_ratio": bullish_ratio
-            }
-            
-            total_sentiment += avg_sentiment
         
         # Calculate overall market mood
-        avg_market_sentiment = total_sentiment / len(request.symbols)
+        avg_market_sentiment = total_sentiment / len([s for s in request.symbols if market_insights[s]["tweet_count"] > 0])
         market_mood = "bullish" if avg_market_sentiment > 0.1 else "bearish" if avg_market_sentiment < -0.1 else "neutral"
         
         # Find correlated topics across symbols
@@ -252,8 +278,13 @@ async def analyze_market_trends(request: TrendAnalysisRequest) -> TrendAnalysisR
             correlated_topics=correlated_topics,
             market_mood=market_mood
         )
+    except HTTPException:
+        raise
     except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
+        raise HTTPException(
+            status_code=500,
+            detail=f"An error occurred while analyzing market trends: {str(e)}"
+        )
 
 @mcp.post("/monitor_market")
 async def monitor_market(request: MarketMonitorRequest) -> MarketMonitorResponse:
@@ -262,39 +293,63 @@ async def monitor_market(request: MarketMonitorRequest) -> MarketMonitorResponse
         all_texts = []
         
         for symbol in request.watchlist:
-            # Get recent tweets for each symbol
-            search_query = f"${symbol} OR #{symbol} lang:en -is:retweet"
-            tweets = client.search_recent_tweets(
-                query=search_query,
-                max_results=50,
-                tweet_fields=['created_at', 'public_metrics']
+            try:
+                # Get recent tweets for each symbol
+                search_query = f"symbol:{symbol} OR #{symbol} lang:en -is:retweet"
+                tweets = client.search_recent_tweets(
+                    query=search_query,
+                    max_results=50,
+                    tweet_fields=['created_at', 'public_metrics']
+                )
+                
+                if not tweets.data:
+                    sentiment_by_symbol[symbol] = 0
+                    continue
+                
+                texts = [tweet.text for tweet in tweets.data]
+                all_texts.extend(texts)
+                
+                # Calculate sentiment for this symbol
+                sentiments = [TextBlob(text).sentiment.polarity for text in texts]
+                avg_sentiment = sum(sentiments) / len(sentiments) if sentiments else 0
+                sentiment_by_symbol[symbol] = avg_sentiment
+            except tweepy_errors.TooManyRequests as e:
+                raise HTTPException(
+                    status_code=429,
+                    detail="Twitter API rate limit exceeded. Please try again later."
+                )
+            except (tweepy_errors.Forbidden, tweepy_errors.Unauthorized) as e:
+                raise HTTPException(
+                    status_code=403,
+                    detail=f"Twitter API access denied for symbol {symbol}. Please check your API access level and credentials. Error: {str(e)}"
+                )
+        
+        if not sentiment_by_symbol:
+            raise HTTPException(
+                status_code=404,
+                detail="No data found for any of the requested symbols"
             )
-            
-            texts = [tweet.text for tweet in tweets.data]
-            all_texts.extend(texts)
-            
-            # Calculate sentiment for this symbol
-            sentiments = [TextBlob(text).sentiment.polarity for text in texts]
-            avg_sentiment = sum(sentiments) / len(sentiments) if sentiments else 0
-            sentiment_by_symbol[symbol] = avg_sentiment
         
         # Calculate overall market sentiment
-        overall_sentiment = sum(sentiment_by_symbol.values()) / len(sentiment_by_symbol)
+        active_symbols = [s for s in sentiment_by_symbol.keys() if sentiment_by_symbol[s] != 0]
+        if not active_symbols:
+            overall_sentiment = 0
+        else:
+            overall_sentiment = sum(sentiment_by_symbol[s] for s in active_symbols) / len(active_symbols)
         overall_label = "bullish" if overall_sentiment > 0.1 else "bearish" if overall_sentiment < -0.1 else "neutral"
         
         # Get trending topics across all symbols
-        trending_topics = extract_market_topics(all_texts)
+        trending_topics = extract_market_topics(all_texts) if all_texts else []
         
         # Calculate price-sentiment correlation
         price_sentiment = {}
         for symbol in request.watchlist:
-            price_mentions = extract_price_mentions([t for t in all_texts if symbol in t])
-            if price_mentions:
-                avg_price = sum(float(p.strip('$')) for p in price_mentions.keys()) / len(price_mentions)
-                price_sentiment[symbol] = {
-                    'avg_mentioned_price': avg_price,
-                    'sentiment_correlation': sentiment_by_symbol[symbol]
-                }
+            symbol_texts = [t for t in all_texts if symbol.lower() in t.lower()]
+            if symbol_texts:
+                price_mentions = extract_price_mentions(symbol_texts)
+                if price_mentions:
+                    avg_price = sum(float(p.strip('$')) for p in price_mentions.keys()) / len(price_mentions)
+                    price_sentiment[symbol] = avg_price * sentiment_by_symbol[symbol]
         
         return MarketMonitorResponse(
             symbols=request.watchlist,
@@ -303,8 +358,13 @@ async def monitor_market(request: MarketMonitorRequest) -> MarketMonitorResponse
             trending_topics=trending_topics,
             price_sentiment_correlation=price_sentiment
         )
+    except HTTPException:
+        raise
     except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
+        raise HTTPException(
+            status_code=500,
+            detail=f"An error occurred while monitoring the market: {str(e)}"
+        )
 
 # Health check endpoint (required by Smithery)
 @app.get("/health")

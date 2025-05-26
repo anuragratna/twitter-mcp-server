@@ -3,6 +3,9 @@ description: Twitter MCP server with advanced sentiment analysis capabilities
 version: 1.0.0
 type: http  # Using HTTP transport (recommended)
 
+# Base directory configuration
+base_dir: src  # Points to the source code directory
+
 # Environment variables that will be needed
 env:
   - TWITTER_API_KEY
@@ -22,6 +25,7 @@ dependencies:
 http:
   endpoint: /mcp  # Required by Smithery
   port: 8000
+  module: twitter_mcp:app  # Specifies the FastAPI application module
 
 # Security settings
 security:

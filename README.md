@@ -26,8 +26,17 @@ A powerful financial market sentiment analysis tool that leverages Twitter data 
 
 ### Prerequisites
 - Python 3.9 or higher
-- Twitter API credentials (Developer Account required)
+- Twitter API v2 credentials (Developer Account required)
 - pip or uv package manager
+
+### Twitter API Setup
+1. Create a Twitter Developer Account at https://developer.twitter.com
+2. Create a new project and app
+3. Enable OAuth 2.0
+4. Generate the following credentials:
+   - API Key and Secret
+   - Access Token and Secret
+   - Bearer Token (for v2 API)
 
 ### Installation
 
@@ -51,10 +60,12 @@ pip install -r requirements.txt
 4. Set up environment variables:
 Create a `.env` file in the root directory with your Twitter API credentials:
 ```env
+# Twitter API v2 Credentials
 TWITTER_API_KEY=your_api_key_here
 TWITTER_API_SECRET=your_api_secret_here
 TWITTER_ACCESS_TOKEN=your_access_token_here
 TWITTER_ACCESS_TOKEN_SECRET=your_access_token_secret_here
+TWITTER_BEARER_TOKEN=your_bearer_token_here  # Required for v2 API
 
 # Server Configuration
 PORT=8000
@@ -92,6 +103,22 @@ Example request:
 {
     "symbol": "AAPL",
     "lookback_hours": 24
+}
+```
+
+Example response:
+```json
+{
+    "symbol": "AAPL",
+    "sentiment_score": 0.42,
+    "sentiment_label": "bullish",
+    "tweet_count": 100,
+    "common_topics": ["earnings", "stock price", "market performance"],
+    "price_mentions": {
+        "$150": 5,
+        "$155.50": 3
+    },
+    "bullish_ratio": 0.75
 }
 ```
 
@@ -161,7 +188,7 @@ This project is licensed under the MIT License - see the LICENSE file for detail
 
 ## Acknowledgments
 
-- Twitter API for providing real-time market data
+- Twitter API v2 for providing real-time market data
 - TextBlob for sentiment analysis
 - FastAPI for the web framework
 - Smithery for deployment support 

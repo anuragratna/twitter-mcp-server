@@ -7,13 +7,14 @@ from fastapi import FastAPI, HTTPException, APIRouter
 from textblob import TextBlob
 import tweepy
 from tweepy import errors as tweepy_errors
-from typing import Dict, List, Optional
+from typing import Dict, List, Optional, Tuple
 import os
 from dotenv import load_dotenv
 from pydantic import BaseModel
 from collections import Counter
 import re
 from datetime import datetime, timedelta
+import time
 
 # Load environment variables
 load_dotenv()
@@ -78,6 +79,10 @@ class MarketMonitorResponse(BaseModel):
     trending_topics: List[str]
     price_sentiment_correlation: Dict[str, float]
 
+# Add cache for sentiment analysis results
+sentiment_cache: Dict[str, Tuple[float, MarketSentimentResponse]] = {}
+CACHE_DURATION = 300  # Cache results for 5 minutes
+
 def extract_price_mentions(texts: List[str]) -> Dict[str, int]:
     """Extract price mentions from tweets using regex"""
     price_pattern = r'\$\d+\.?\d*|\d+\.?\d*\$'
@@ -141,16 +146,22 @@ async def get_capabilities():
 @mcp.post("/analyze_market_sentiment")
 async def analyze_market_sentiment(request: MarketSentimentRequest) -> MarketSentimentResponse:
     try:
-        # Get tweets about the stock symbol using v2 API
-        search_query = f"symbol:{request.symbol} OR #{request.symbol} lang:en -is:retweet"
+        # Check cache first
+        if request.symbol in sentiment_cache:
+            timestamp, cached_response = sentiment_cache[request.symbol]
+            if time.time() - timestamp < CACHE_DURATION:
+                return cached_response
+        
+        # Get tweets about the stock symbol using v2 API with reduced max_results
+        search_query = f"${request.symbol} OR #{request.symbol} lang:en -is:retweet"
         tweets = client.search_recent_tweets(
             query=search_query,
-            max_results=100,
+            max_results=10,  # Reduced from 100 to avoid rate limits
             tweet_fields=['created_at', 'public_metrics']
         )
         
         if not tweets.data:
-            return MarketSentimentResponse(
+            response = MarketSentimentResponse(
                 symbol=request.symbol,
                 sentiment_score=0,
                 sentiment_label="neutral",
@@ -159,6 +170,8 @@ async def analyze_market_sentiment(request: MarketSentimentRequest) -> MarketSen
                 price_mentions={},
                 bullish_ratio=0.5
             )
+            sentiment_cache[request.symbol] = (time.time(), response)
+            return response
         
         # Analyze sentiment
         texts = [tweet.text for tweet in tweets.data]
@@ -178,24 +191,36 @@ async def analyze_market_sentiment(request: MarketSentimentRequest) -> MarketSen
         bullish_ratio = calculate_bullish_ratio(texts)
         market_topics = extract_market_topics(texts)
             
-        return MarketSentimentResponse(
+        response = MarketSentimentResponse(
             symbol=request.symbol,
-            sentiment_score=avg_sentiment,
+            sentiment_score=round(avg_sentiment, 3),
             sentiment_label=label,
             tweet_count=len(texts),
             common_topics=market_topics,
             price_mentions=price_mentions,
-            bullish_ratio=bullish_ratio
+            bullish_ratio=round(bullish_ratio, 2)
+        )
+        
+        # Cache the response
+        sentiment_cache[request.symbol] = (time.time(), response)
+        return response
+        
+    except tweepy_errors.TooManyRequests as e:
+        # If rate limited but we have cached data, return it even if expired
+        if request.symbol in sentiment_cache:
+            _, cached_response = sentiment_cache[request.symbol]
+            return cached_response
+            
+        # Otherwise, raise the rate limit error
+        retry_after = e.response.headers.get('retry-after', '60 seconds')
+        raise HTTPException(
+            status_code=429,
+            detail=f"Twitter API rate limit exceeded. Please try again after {retry_after}."
         )
     except (tweepy_errors.Forbidden, tweepy_errors.Unauthorized) as e:
         raise HTTPException(
             status_code=403,
             detail=f"Twitter API access denied. Please check your API access level and credentials. Error: {str(e)}"
-        )
-    except tweepy_errors.TooManyRequests as e:
-        raise HTTPException(
-            status_code=429,
-            detail="Twitter API rate limit exceeded. Please try again later."
         )
     except Exception as e:
         raise HTTPException(
